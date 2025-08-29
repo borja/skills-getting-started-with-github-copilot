@@ -122,6 +122,10 @@ def signup_for_activity(activity_name: str, email: str):
     if email in activity["participants"]:
         raise HTTPException(status_code=400, detail="Student already signed up for this activity")
 
+    # Check if the activity has reached its maximum capacity
+    if len(activity["participants"]) >= activity["max_participants"]:
+        raise HTTPException(status_code=400, detail="Activity has reached maximum capacity")
+
     # Add student using MongoDB's array update operator
     result = activities_collection.update_one(
         {"_id": activity_name},
@@ -130,5 +134,30 @@ def signup_for_activity(activity_name: str, email: str):
 
     if result.modified_count == 1:
         return {"message": f"Signed up {email} for {activity_name}"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to update activity")
+
+@app.post("/activities/{activity_name}/unregister")
+def unregister_from_activity(activity_name: str, email: str):
+    """Unregister a student from an activity"""
+    # Find the activity in MongoDB
+    activity = activities_collection.find_one({"_id": activity_name})
+    
+    # Validate activity exists
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    # Validate student is signed up
+    if email not in activity["participants"]:
+        raise HTTPException(status_code=400, detail="Student not registered for this activity")
+
+    # Remove student using MongoDB's array update operator
+    result = activities_collection.update_one(
+        {"_id": activity_name},
+        {"$pull": {"participants": email}}
+    )
+
+    if result.modified_count == 1:
+        return {"message": f"Unregistered {email} from {activity_name}"}
     else:
         raise HTTPException(status_code=500, detail="Failed to update activity")
